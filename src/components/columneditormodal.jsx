@@ -2,26 +2,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
 import {
-    // Import specific icons that match the screenshot closely
-    IoTextOutline,           // Text
-    IoListOutline,           // Bulleted list
-    IoToggleOutline,         // Yes/No (or IoCheckmarkCircleOutline)
-    IoCalendarClearOutline,  // Date
-    IoPricetagOutline,       // Tag
-    IoPricetagsOutline,      // Multiple tags
-    IoDocumentTextOutline,   // Verbatim
-    IoCreateOutline,         // Manual input
+    IoTextOutline,
+    IoListOutline,
+    IoToggleOutline,
+    IoCalendarClearOutline,
+    IoPricetagOutline,
+    IoPricetagsOutline,
+    IoDocumentTextOutline,
+    IoCreateOutline,
     IoInformationCircleOutline,
     IoSparklesOutline,
-    IoChevronDown,          // Dropdown arrow
-    IoCheckmark,            // Checkmark for selected
+    IoChevronDown,
+    IoCheckmark,
 } from 'react-icons/io5';
 
-// Update format options with the correct icons
 const formatOptions = [
   { value: 'Text', label: 'Text', icon: <IoTextOutline className="mr-2 flex-shrink-0"/> },
   { value: 'Bulleted list', label: 'Bulleted list', icon: <IoListOutline className="mr-2 flex-shrink-0"/> },
-  { value: 'Yes/No', label: 'Yes/No', icon: <IoToggleOutline className="mr-2 flex-shrink-0"/> }, // Using Toggle
+  { value: 'Yes/No', label: 'Yes/No', icon: <IoToggleOutline className="mr-2 flex-shrink-0"/> },
   { value: 'Date', label: 'Date', icon: <IoCalendarClearOutline className="mr-2 flex-shrink-0"/> },
   { value: 'Tag', label: 'Tag', icon: <IoPricetagOutline className="mr-2 flex-shrink-0"/> },
   { value: 'Multiple tags', label: 'Multiple tags', icon: <IoPricetagsOutline className="mr-2 flex-shrink-0"/> },
@@ -34,12 +32,10 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
   const [prompt, setPrompt] = useState('');
   const [format, setFormat] = useState(formatOptions[0].value);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null); // Ref for detecting clicks outside
+  const dropdownRef = useRef(null);
 
-  // Get the current selected option object for display
   const selectedOption = formatOptions.find(o => o.value === format) || formatOptions[0];
 
-  // Effect to load initial data
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
@@ -51,28 +47,24 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         setPrompt('');
         setFormat(formatOptions[0].value);
       }
-      setIsDropdownOpen(false); // Close dropdown when modal opens/reopens
+      setIsDropdownOpen(false);
     }
   }, [isOpen, initialData]);
 
-   // Effect to handle clicks outside the dropdown
    useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
     };
-    // Bind the event listener
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      // Unbind the event listener on clean up
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [dropdownRef]); // Only re-run if ref changes (which it shouldn't)
+  }, [dropdownRef]);
 
 
   const handleSave = () => {
-    // Validation logic remains the same
     if (!label.trim()) {
       alert("Label cannot be empty.");
       return;
@@ -86,19 +78,21 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
       id: initialData ? initialData.id : crypto.randomUUID(),
       label: label.trim(),
       prompt: prompt.trim(),
-      format: format, // Include selected format
+      format: format,
     };
     onSave(columnData);
     onClose();
   };
 
   const handleAiGeneratePrompt = () => {
-    alert("AI Prompt Generation feature not implemented in this example.");
+    // This functionality is in ColumnEditorPopover, so this is a placeholder
+    // or could be removed if this modal isn't intended to have it.
+    alert("AI Prompt Generation feature is typically in the Popover variant for this app.");
   };
 
   const handleFormatSelect = (value) => {
       setFormat(value);
-      setIsDropdownOpen(false); // Close dropdown after selection
+      setIsDropdownOpen(false);
   }
 
   if (!isOpen) return null;
@@ -108,18 +102,17 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? `Edit Column: ${initialData.label}` : 'Add New Column'}
-      size="max-w-xl"
+      size="max-w-xl" // Using the size prop
     >
-      <div className="space-y-5 p-1">
+      <div className="space-y-5 p-1"> {/* p-1 if modal itself has p-4/p-5 */}
         {/* Format Section - Custom Dropdown */}
         <div>
-          <label htmlFor="col-format-button" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="col-format-button-modal" className="block text-sm font-medium text-gray-700 mb-1">
             Format
           </label>
           <div className="relative" ref={dropdownRef}>
-            {/* Dropdown Button */}
             <button
-              id="col-format-button"
+              id="col-format-button-modal"
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="relative w-full cursor-default rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm"
@@ -135,19 +128,18 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
               </span>
             </button>
 
-            {/* Dropdown Options Panel */}
             {isDropdownOpen && (
               <ul
                 className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
                 tabIndex="-1"
                 role="listbox"
-                aria-labelledby="col-format-button"
+                aria-labelledby="col-format-button-modal"
               >
                 {formatOptions.map((opt) => (
                   <li
                     key={opt.value}
                     className={`relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 hover:bg-indigo-600 hover:text-white ${format === opt.value ? 'bg-indigo-50 text-indigo-800 font-semibold' : ''}`}
-                    id={`listbox-option-${opt.value}`}
+                    id={`listbox-option-modal-${opt.value}`}
                     role="option"
                     aria-selected={format === opt.value}
                     onClick={() => handleFormatSelect(opt.value)}
@@ -158,9 +150,8 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                         {opt.label}
                       </span>
                     </div>
-                    {/* Selected Checkmark */}
                     {format === opt.value ? (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-indigo-600 hover:text-white">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-indigo-600 group-hover:text-white"> {/* Ensure checkmark color contrasts on hover */}
                          <IoCheckmark className="h-5 w-5" aria-hidden="true" />
                       </span>
                     ) : null}
@@ -173,13 +164,13 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
 
         {/* Label Section */}
         <div>
-          <label htmlFor="col-label" className="flex items-center text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="col-label-modal" className="flex items-center text-sm font-medium text-gray-700 mb-1">
             Label
             <span className="text-red-500 ml-0.5">*</span>
             <span title="The header displayed in the table." className="ml-1 text-gray-400 cursor-help"><IoInformationCircleOutline/></span>
           </label>
           <input
-            id="col-label"
+            id="col-label-modal"
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
@@ -191,13 +182,13 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         {/* Prompt Section - Conditionally hidden for Manual Input */}
         {format !== 'Manual input' && (
           <div>
-            <label htmlFor="col-prompt" className="flex items-center text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="col-prompt-modal" className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Prompt
               {format !== 'Manual input' && <span className="text-red-500 ml-0.5">*</span>}
               <span title="The specific question sent to the AI based on the document text." className="ml-1 text-gray-400 cursor-help"><IoInformationCircleOutline/></span>
             </label>
             <textarea
-              id="col-prompt"
+              id="col-prompt-modal"
               rows="4"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -212,9 +203,9 @@ const ColumnEditorModal = ({ isOpen, onClose, onSave, initialData = null }) => {
           {format !== 'Manual input' ? (
             <button
               type="button"
-              onClick={handleAiGeneratePrompt}
+              onClick={handleAiGeneratePrompt} // This will show an alert as per its definition
               className="flex items-center px-3 py-1.5 bg-white text-indigo-600 text-sm rounded-md border border-indigo-300 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 transition-colors duration-150"
-              title="Generate prompt suggestion (Not Implemented)"
+              title="Generate prompt suggestion (Feature in Popover)"
             >
               <IoSparklesOutline className="mr-1.5" size={18}/> AI Generate
             </button>

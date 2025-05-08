@@ -1,36 +1,54 @@
+// src/components/ActionBar.jsx
 import React from 'react';
-import { IoDocumentsOutline, IoAddCircleOutline, IoPlayCircleOutline, IoDownloadOutline } from 'react-icons/io5';
+import {
+    IoDocumentsOutline, IoAddCircleOutline, IoPlayCircleOutline, IoDownloadOutline,
+    IoPencil
+} from 'react-icons/io5'; // Removed unused icons
 
 const ActionBar = ({
+  reviewTitle,
+  onReviewTitleChange,
   onAddDocumentClick,
   onAddColumnClick,
   onRunAllClick,
   onExportClick,
-  canRunOrExport // Boolean to disable buttons if no docs/cols
+  canRunOrExport
 }) => {
-  const buttonClass = "flex items-center px-3 py-1.5 bg-white text-gray-700 text-sm rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150";
+  const buttonClass = "flex items-center px-3 py-1.5 bg-white text-gray-700 text-sm rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shadow-sm";
   const primaryButtonClass = "flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150";
+  const iconClass = "mr-1.5";
 
   return (
-    <div className="mb-6 p-3 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-between sticky top-0 z-20"> {/* Sticky bar */}
-      {/* Left side actions */}
+    <div className="p-3 bg-white border-b border-gray-200 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+      {/* Left side */}
       <div className="flex items-center space-x-3">
-         <h2 className="text-lg font-semibold text-gray-800 mr-4">Tabular Review</h2> {/* Example Title */}
+         <div className="group relative flex items-center">
+             <input
+                type="text"
+                value={reviewTitle}
+                onChange={onReviewTitleChange}
+                className="text-lg font-semibold text-gray-800 border-none focus:ring-1 focus:ring-indigo-500 rounded px-2 py-0.5 bg-transparent hover:bg-gray-100 w-auto min-w-[150px]"
+                placeholder="Untitled Review"
+             />
+             <IoPencil size={14} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"/>
+         </div>
+         <div className="h-5 w-px bg-gray-300"></div>
          <button onClick={onAddDocumentClick} className={buttonClass}>
-           <IoDocumentsOutline className="mr-1.5" size={18}/> Add Documents
+           <IoDocumentsOutline className={iconClass} size={18}/> Add documents
          </button>
          <button onClick={onAddColumnClick} className={buttonClass}>
-            <IoAddCircleOutline className="mr-1.5" size={18}/> Add Column
+            <IoAddCircleOutline className={iconClass} size={18}/> Add columns
          </button>
       </div>
 
-      {/* Right side actions */}
+      {/* Right side */}
       <div className="flex items-center space-x-3">
+        {/* Removed Language, Templates, Uploads, Share */}
         <button onClick={onExportClick} className={buttonClass} disabled={!canRunOrExport}>
-            <IoDownloadOutline className="mr-1.5" size={18}/> Export
+            <IoDownloadOutline className={iconClass} size={18}/> Export
         </button>
         <button onClick={onRunAllClick} className={primaryButtonClass} disabled={!canRunOrExport}>
-            <IoPlayCircleOutline className="mr-1.5" size={18}/> Run all
+            <IoPlayCircleOutline className={iconClass} size={18}/> Run all
         </button>
       </div>
     </div>
