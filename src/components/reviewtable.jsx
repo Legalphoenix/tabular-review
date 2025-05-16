@@ -1,5 +1,5 @@
 // src/components/ReviewTable.jsx
-import React, { useState, useEffect, useRef } from "react"; // Removed useCallback as it wasn't used here
+import React, { useState, useEffect, useRef } from "react";
 import Spinner from "./Spinner";
 import {
     IoTrashOutline, IoPencil, IoPlay, IoReload,
@@ -16,9 +16,9 @@ const renderBulletedList = (text) => {
                       .map(line => line.replace(/^[\*\-\•]\s*/, ''));
     if (lines.length === 0) return <span className="text-gray-400 italic">Empty list</span>;
     return (
-        <ul className="list-disc list-inside pl-1 space-y-1">
+        <ul className="list-disc list-inside pl-1 space-y-0.5">
             {lines.map((item, index) => (
-                <li key={index}>{item}</li>
+                <li key={index} className="text-sm">{item}</li>
             ))}
         </ul>
     );
@@ -27,70 +27,126 @@ const renderBulletedList = (text) => {
 const EditableCellContent = ({ initialValue, onSave, format }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [value, setValue] = useState(initialValue);
-    const inputRef = useRef(null);
+    const textareaRef = useRef(null);
+    const wrapperRef = useRef(null); // For the display div
+
+    const NEW_MAX_HEIGHT = 500; // Increased max height
+
+    const [editorStyle, setEditorStyle] = useState({
+        visibility: 'hidden', top: '0px', left: '0px', width: '0px', minHeight: '0px', zIndex: 30
+    });
+
+    const DISPLAY_CONTENT_MAX_HEIGHT_CSS = '1.25rem'; 
+    const CELL_WRAPPER_MIN_HEIGHT_CSS = `calc(${DISPLAY_CONTENT_MAX_HEIGHT_CSS} + 1.5rem)`;
 
     useEffect(() => {
         setValue(initialValue);
     }, [initialValue]);
 
+    const handleDoubleClick = () => {
+        if (!isEditing) {
+            setIsEditing(true);
+        }
+    };
+
     useEffect(() => {
-        if (isEditing && inputRef.current) {
-            inputRef.current.focus();
-            const len = inputRef.current.value.length;
-            inputRef.current.setSelectionRange(len, len);
+        if (isEditing && wrapperRef.current) {
+            const wrapperEl = wrapperRef.current;
+            setEditorStyle({
+                visibility: 'visible',
+                top: `0px`, 
+                left: `0px`,
+                width: `${wrapperEl.offsetWidth}px`, 
+                minHeight: `${wrapperEl.offsetHeight}px`, 
+                zIndex: 30,
+            });
+        } else if (!isEditing) {
+            setEditorStyle({ visibility: 'hidden', top: '0px', left: '0px', width: '0px', minHeight: '0px', zIndex: 30 });
         }
     }, [isEditing]);
 
-    const handleDoubleClick = () => {
-        setIsEditing(true);
-    };
+    useEffect(() => {
+        if (isEditing && editorStyle.visibility === 'visible' && textareaRef.current) {
+            const ta = textareaRef.current;
+            ta.focus();
+            ta.scrollTop = 0; // Scroll to top when editing starts
+            
+            ta.style.height = 'auto'; 
+            const currentMinHeight = parseFloat(editorStyle.minHeight) || 0;
+            const newHeight = Math.max(ta.scrollHeight, currentMinHeight);
+            ta.style.height = `${Math.min(newHeight, NEW_MAX_HEIGHT)}px`; // Use new max height
+            
+            // Set cursor to start or end based on preference, for now, let's keep it at start due to scrollTop = 0
+            // To set cursor to start:
+            ta.setSelectionRange(0,0); 
+            // To set cursor to end (original behavior, might conflict with scrollTop = 0 visually):
+            // const len = ta.value.length;
+            // ta.setSelectionRange(len, len); 
+        }
+    }, [isEditing, editorStyle, value]); // Keep `value` dependency for height adjustment on type
 
     const handleChange = (e) => {
         setValue(e.target.value);
     };
 
-    const handleBlur = () => {
+    const handleEditorBlur = () => {
         setIsEditing(false);
-        if (value !== initialValue) {
+        if (value !== initialValue) { // Save if value changed
             onSave(value);
         }
     };
 
-    const handleKeyDown = (e) => {
+    const handleEditorKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            inputRef.current.blur();
+            textareaRef.current.blur();
         } else if (e.key === 'Escape') {
-            setValue(initialValue);
-            setIsEditing(false);
+            e.preventDefault(); // Good practice
+            // Do NOT revert value: setValue(initialValue); 
+            textareaRef.current.blur(); // This will trigger handleEditorBlur, which will save current text
         }
     };
-
-    if (isEditing) {
-        return (
-            <textarea
-                ref={inputRef}
-                value={value}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                className="absolute inset-0 w-full h-full p-2 text-sm border-2 border-indigo-500 rounded-md resize-none focus:outline-none z-10 bg-white shadow-md"
-                rows={Math.max(3, (value?.split('\n').length || 1) + 1 )}
-            />
-        );
-    }
     
-    const displayContent = () => {
-        if (!value && value !== 0) return <span className="text-gray-400 italic">-</span>; // Handle empty, null, undefined but allow 0
-        if (format === 'Bulleted list') return renderBulletedList(value);
-        return value;
+    const renderDisplayContent = () => {
+        if (!value && value !== 0) return <span className="text-sm text-gray-400 italic">-</span>;
+        
+        const displayStyle = { maxHeight: DISPLAY_CONTENT_MAX_HEIGHT_CSS, overflow: 'hidden' };
+
+        if (format === 'Bulleted list') {
+            return <div style={{...displayStyle, overflowY: 'auto'}}>{renderBulletedList(value)}</div>;
+        }
+        return <div className="truncate-multiline text-sm" style={displayStyle}>{value}</div>;
     };
 
     return (
-         <div onDoubleClick={handleDoubleClick} className="block w-full h-full cursor-text min-h-[2.5em] whitespace-pre-wrap break-words p-3">
-            {displayContent()}
-        </div>
-    )
+        <>
+            <div
+                ref={wrapperRef}
+                onDoubleClick={handleDoubleClick}
+                className="w-full h-full cursor-text p-3" 
+                style={{ minHeight: CELL_WRAPPER_MIN_HEIGHT_CSS }}
+            >
+                {renderDisplayContent()}
+            </div>
+
+            {isEditing && (
+                <textarea
+                    ref={textareaRef}
+                    value={value}
+                    onChange={handleChange}
+                    onBlur={handleEditorBlur}
+                    onKeyDown={handleEditorKeyDown}
+                    className="absolute text-sm border-2 border-indigo-500 rounded-md resize-none focus:outline-none shadow-lg p-3 bg-white"
+                    style={{
+                        ...editorStyle, 
+                        maxHeight: `${NEW_MAX_HEIGHT}px`, // Use new max height
+                        overflowY: 'auto',
+                        boxSizing: 'border-box',
+                    }}
+                />
+            )}
+        </>
+    );
 };
 
 
@@ -136,7 +192,7 @@ const ColumnHeaderMenu = ({ column, onEditColumn, onDeleteColumn }) => {
             </button>
 
             {isOpen && (
-                <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-30">
+                <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-40">
                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
                         <button onClick={handleEdit} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                             <IoPencil size={16} className="mr-3 text-gray-500"/> Edit column
@@ -194,7 +250,7 @@ const ReviewTable = ({
 
   return (
     <div className="shadow-sm rounded-lg border border-gray-200 bg-white overflow-hidden flex flex-col flex-grow">
-      <div className="overflow-x-auto flex-grow relative"> {/* Ensure this container can grow */}
+      <div className="overflow-x-auto flex-grow relative">
         {showEmptyStateMessage && (
             <div className="absolute inset-0 flex items-center justify-center z-0">
                 <p className="text-center py-10 text-gray-500 italic">
@@ -202,14 +258,14 @@ const ReviewTable = ({
                 </p>
             </div>
         )}
-        <table className="min-w-full divide-y divide-gray-200 border-collapse"> {/* Removed table-fixed for now */}
-          <thead className="bg-gray-50 sticky top-0 z-10">
+        <table className="min-w-full divide-y divide-gray-200 border-collapse table-fixed">
+          <thead className="bg-gray-50 sticky top-0 z-20"> 
             <tr>
-              <th scope="col" className="sticky left-0 bg-gray-50 px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 z-20 w-[280px] min-w-[200px] max-w-[400px]"> {/* Slightly wider doc column */}
+              <th scope="col" className="sticky left-0 bg-gray-50 px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 z-20 w-[280px]">
                 Document
               </th>
               {columns.map((col) => (
-                <th key={col.id} scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[250px]"> {/* Let content push width */}
+                <th key={col.id} scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[350px]">
                   <div className="flex items-center justify-between group">
                     <span className="truncate font-medium" title={col.label}>{col.label}</span>
                     <ColumnHeaderMenu
@@ -220,7 +276,7 @@ const ReviewTable = ({
                   </div>
                 </th>
               ))}
-               <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[150px] w-[150px]">
+               <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[150px]">
                   <button onClick={onAddColumnClick} className="flex items-center text-gray-500 hover:text-indigo-600 w-full">
                      <IoAddOutline className="mr-1"/> Add column
                   </button>
@@ -228,15 +284,14 @@ const ReviewTable = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {/* Render add document row even if documents array is empty, but not if empty state message is shown */}
             {(!showEmptyStateMessage || documents.length > 0) && documents.map((doc, docIndex) => (
               <React.Fragment key={doc.id}>
                 <tr className="hover:bg-gray-50/50 transition-colors duration-150 group">
-                  <td className="sticky left-0 bg-white group-hover:bg-gray-50/50 px-3 py-2.5 text-sm font-medium text-gray-800 border-r border-gray-200 z-10 align-top w-[280px] min-w-[200px] max-w-[400px]">
+                  <td className="sticky left-0 bg-white group-hover:bg-gray-50/50 px-3 py-2.5 text-sm font-medium text-gray-800 border-r border-gray-200 z-10 align-top w-[280px]">
                     <div className="flex items-start justify-between">
-                        <div>
+                        <div className="flex-grow min-w-0">
                             <span className="text-xs text-gray-400 mr-1.5">{docIndex + 1}.</span>
-                            <span className="truncate" title={doc.name}>{doc.name}</span>
+                            <span className="truncate block" title={doc.name}>{doc.name}</span>
                         </div>
                         <div className="flex items-center space-x-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-2">
                             <button
@@ -271,9 +326,9 @@ const ReviewTable = ({
                     const isManual = col.format === 'Manual input';
 
                     return (
-                      <td key={`${doc.id}-${col.id}`} className="text-sm text-gray-700 relative border-r border-gray-200 min-w-[250px] align-top group"> {/* Removed px-0 py-0, EditableCellContent has p-3 */}
-                        <div className="max-h-60 overflow-y-auto min-h-[3.5em] pb-7 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 scrollbar-thumb-rounded"> {/* Wrapper for scroll, EditableCell has padding */}
-                          {isLoading && <div className="flex items-center text-gray-500 p-3"><Spinner size="h-4 w-4" additionalClasses="mr-2"/> Processing...</div>}
+                      <td key={`${doc.id}-${col.id}`} className="relative border-r border-gray-200 align-top group w-[350px]">
+                        <div className="h-full"> 
+                          {isLoading && <div className="flex items-center text-gray-500 p-3 text-sm"><Spinner size="h-4 w-4" additionalClasses="mr-2"/> Processing...</div>}
                           {isError && <span className="text-red-500 text-xs italic p-3 block">Error: {answer || 'Failed'}</span>}
                           {!isLoading && !isError &&
                               <EditableCellContent
@@ -287,11 +342,11 @@ const ReviewTable = ({
                           <button
                             onClick={() => !isLoading && onRunCell(doc.id, col.id)}
                             disabled={isLoading}
-                            className={`absolute bottom-1.5 right-1.5 p-1 rounded ${
+                            className={`absolute bottom-1.5 right-1.5 p-1 rounded ${ 
                               isLoading ? 'text-gray-400 cursor-not-allowed' :
                               isError ? 'text-orange-500 hover:bg-orange-100' :
                               'text-indigo-500 hover:bg-indigo-100'
-                            } opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150`}
+                            } opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 z-10`}
                             title={isLoading ? "Processing..." : isError ? "Retry Review" : "Run Review"}
                           >
                             {isLoading ? <Spinner size="h-4 w-4" /> : isError ? <IoReload size={16}/> : <IoPlay size={16} />}
@@ -300,11 +355,11 @@ const ReviewTable = ({
                       </td>
                     );
                   })}
-                   <td className="px-3 py-2.5 border-r border-gray-200 min-w-[150px] w-[150px] align-top"></td>
+                   <td className="px-3 py-2.5 border-r border-gray-200 align-top w-[150px]"></td>
                 </tr>
                  {doc.appendices?.map((appendix) => (
                     <tr key={appendix.id} className="bg-gray-50 hover:bg-gray-100/80 transition-colors duration-150 group">
-                        <td className="sticky left-0 bg-gray-50 group-hover:bg-gray-100/80 px-3 py-1.5 text-sm text-gray-600 border-r border-gray-200 z-10 align-top w-[280px] min-w-[200px] max-w-[400px]">
+                        <td className="sticky left-0 bg-gray-50 group-hover:bg-gray-100/80 px-3 py-1.5 text-sm text-gray-600 border-r border-gray-200 z-10 align-top w-[280px]">
                             <div className="flex items-center justify-between pl-4">
                                 <div className="flex items-center truncate">
                                     <IoChevronForward size={12} className="mr-1 text-gray-400 flex-shrink-0"/>
@@ -321,28 +376,27 @@ const ReviewTable = ({
                             </div>
                         </td>
                         {columns.map(col => (
-                            <td key={`${appendix.id}-${col.id}`} className="px-3 py-1.5 text-sm text-gray-400 italic border-r border-gray-200 min-w-[250px] align-top">
+                            <td key={`${appendix.id}-${col.id}`} className="px-3 py-1.5 text-sm text-gray-400 italic border-r border-gray-200 align-top w-[350px]">
                                 -
                             </td>
                          ))}
-                         <td className="px-3 py-1.5 border-r border-gray-200 min-w-[150px] w-[150px] align-top"></td>
+                         <td className="px-3 py-1.5 border-r border-gray-200 align-top w-[150px]"></td>
                     </tr>
                 ))}
               </React.Fragment>
             ))}
 
-             {/* "Add document" row - always show if not in complete empty state */}
-             {!showEmptyStateMessage && (
+             {(!showEmptyStateMessage || documents.length > 0 ) && (
              <tr>
-                <td className="sticky left-0 bg-white px-3 py-2.5 text-sm font-medium border-r border-gray-200 z-10 w-[280px] min-w-[200px] max-w-[400px] align-top">
+                <td className="sticky left-0 bg-white px-3 py-2.5 text-sm font-medium border-r border-gray-200 z-10 align-top w-[280px]">
                     <button onClick={onAddDocumentClick} className="flex items-center text-gray-500 hover:text-indigo-600 w-full">
                        <IoAddOutline className="mr-1"/> Add document
                     </button>
                 </td>
                  {columns.map(col => (
-                    <td key={`placeholder-doc-${col.id}`} className="px-3 py-2.5 border-r border-gray-200 min-w-[250px] align-top"></td>
+                    <td key={`placeholder-doc-${col.id}`} className="px-3 py-2.5 border-r border-gray-200 align-top w-[350px]"></td>
                  ))}
-                  <td className="px-3 py-2.5 border-r border-gray-200 min-w-[150px] w-[150px] align-top"></td>
+                  <td className="px-3 py-2.5 border-r border-gray-200 align-top w-[150px]"></td>
              </tr>
              )}
           </tbody>

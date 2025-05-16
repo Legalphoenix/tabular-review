@@ -2,3 +2,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.truncate-multiline {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Show 2 lines, then truncate. Adjust as needed. */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word; 
+  /* max-height is applied via inline style in EditableCellContent to match line-clamp */
+}
