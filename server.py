@@ -43,5 +43,33 @@ def generate():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.post("/api/generate_prompt")
+def generate_prompt_api():
+    data = request.get_json()
+    if not data or "label" not in data or "format" not in data:
+        return jsonify({"error": "label and format fields required"}), 400
+
+    label = data["label"]
+    format_ = data["format"]
+
+    meta_prompt_string = f"""You are an assistant helping lawyers draft questions for document review.
+Given the column label '{label}' and desired data format '{format_}', generate a single, concise, and clear question.
+This question will be asked about a legal document to extract information for the column.
+The question should be phrased naturally, as if a lawyer is asking it. Avoid overly technical jargon unless implied by the label.
+
+Column Label: {label}
+Data Format: {format_}
+
+Generated Question:"""
+
+    try:
+        resp = client.models.generate_content(
+            model=model_name,
+            contents=[meta_prompt_string],
+        )
+        return jsonify({"suggested_prompt": resp.text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(port=5001, debug=True)
