@@ -96,10 +96,7 @@ Generated Question:"""
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(port=5001, debug=True)
-
-@app.route("/api/preprocess_pdf", methods=["POST"])
+@app.post("/api/preprocess_pdf")
 def preprocess_pdf():
     if 'main_pdf' not in request.files:
         return jsonify({"error": "main_pdf is required"}), 400
@@ -229,3 +226,6 @@ def serve_uploaded_file(processing_id, filename):
     except Exception as e:
         app.logger.error(f"Error serving file {filename} from {processing_dir_abs}: {e}")
         return "Error serving file.", 500
+
+if __name__ == "__main__":
+    app.run(port=5001, debug=True)
