@@ -1,101 +1,159 @@
-import fitz  # PyMuPDF
+import fitz # PyMuPDF
 import os
 import sys
 
 def annotate_pdf(input_pdf_path: str, output_pdf_path: str, sections_per_page: int = 10):
-    """
-    Annotates a PDF with page numbers and section lines/labels.
-
-    Args:
-        input_pdf_path: Path to the input PDF file.
-        output_pdf_path: Path to save the annotated PDF file.
-        sections_per_page: Number of sections to divide each page into.
-    """
     if not os.path.exists(input_pdf_path):
-        print(f"Error: Input PDF not found at '{input_pdf_path}'")
         raise FileNotFoundError(f"Input PDF not found at '{input_pdf_path}'")
 
-    try:
-        doc = fitz.open(input_pdf_path)
-    except Exception as e:
-        print(f"Error opening PDF '{input_pdf_path}': {e}")
-        raise
-
-    for page_idx, page in enumerate(doc, start=1):
-        page_number_text = f"Page {page_idx}"
-        rect = page.rect
-        height = rect.height
-        width = rect.width
-
-        # Add Page Number (bottom right)
-        # Positioned from the bottom-left: x coordinate is width - 72, y coordinate is 36 from bottom
-        # In PyMuPDF, y coordinates are typically measured from the top, so to place it 36 from bottom,
-        # it should be height - 36. However, the prompt specified page_num_y = 36
-        # This likely means 36 points from the *bottom* of the page.
-        # PyMuPDF's insert_text y-coordinate is from the top-left.
-        # Let's assume the prompt implies the visual bottom right for the text.
-        # If (0,0) is top-left, then y for bottom right text baseline would be height - text_height_approx.
-        # Given font size 10, let's assume text_height_approx is around 10-12 points.
-        # So, page_num_y should be height - 36 (if 36 is distance from bottom edge to text baseline).
-        # Let's try the prompt's literal value first and adjust if it looks off.
-        # The prompt says: page_num_y = 36. This will place it near the top of the page.
-        # To place it at the bottom right, it should be: page_num_y = 36 (PyMuPDF (0,0) is bottom-left for insert_text)
-        page_num_x = width - 72
-        page_num_y = 36
-        page.insert_text((page_num_x, page_num_y), page_number_text, fontsize=10, color=(0, 0, 0), overlay=True)
-
-        # Add Section Lines and Labels
-        # All coordinates are from bottom-left (PyMuPDF default for page modifications)
-        for s_idx in range(sections_per_page):
-            # y_coord_bottom_of_section is the Y-coordinate of the line that forms the
-            # bottom boundary of the current section s_idx.
-            # For s_idx=0 (Section A), this is y=0.
-            # For s_idx=1 (Section B), this is y = height/sections_per_page.
-            # Coordinates are relative to the bottom-left origin.
-            y_coord_bottom_of_section = height * (s_idx / sections_per_page)
-
-            # Draw the line forming the bottom boundary of section s_idx
-            # (which is also the top boundary of section s_idx-1).
-            # Avoid drawing a line at y=0 (page's bottom edge).
-            if s_idx > 0:
-                page.draw_line(
-                    (0, y_coord_bottom_of_section),
-                    (width, y_coord_bottom_of_section),
-                    color=(0.7, 0.7, 0.7), width=0.5, overlay=True
-                )
-
-            # Add section label text (e.g., "Section A")
-            # Label for section s_idx is placed within that section, just above its bottom boundary line.
-            section_text = f"Section {chr(ord('A') + s_idx)}"
-            label_pos_x = 10
-            # label_pos_y places the baseline of the text 3 points above the y_coord_bottom_of_section line.
-            label_pos_y = y_coord_bottom_of_section + 3
-
-            # Visibility check: ensure the label's baseline is below a line 12 points from the page top.
-            if label_pos_y < (height - 12):
-                page.insert_text((label_pos_x, label_pos_y), section_text, fontsize=8, color=(0.3, 0.3, 0.3), overlay=True)
-
+    doc = fitz.open(input_pdf_path)
 
     try:
-        doc.save(output_pdf_path, garbage=4, deflate=True, clean=True)
-    except Exception as e:
-        print(f"Error saving PDF to '{output_pdf_path}': {e}")
-        # doc.close() # Should still try to close
-        raise
-    finally:
-        doc.close()
+        font = fitz.Font("helv")
+    except RuntimeError:
+        # Fallback if "helv" is not available (e.g., in some minimal environments)
+        font = fitz.Font() # Use a default built-in font
 
+    label_fontsize = 10
+    text_color = (0, 0, 0)  # Black
+    box_fill_color = (1, 1, 0.75)  # Light yellow (R, G, B) - (255, 255, 191)
+    box_opacity = 1.0  # Fully opaque. Set to < 1.0 for transparency
+    box_padding = 3  # Padding around text within the box
+
+    for page_num, page in enumerate(doc, start=1):
+        page_rect = page.rect
+        page_height = page_rect.height
+        page_width = page_rect.width
+
+        # --- Page Number Annotation (Top Right) ---
+        page_number_text = f"Page {page_num}"
+        pn_text_width = font.text_length(page_number_text, fontsize=label_fontsize)
+        
+        # Box dimensions
+        pn_box_width = pn_text_width + 2 * box_padding
+        pn_box_height = label_fontsize + 2 * box_padding # Approximate height for one line of text
+        
+        # Box position (top-right corner)
+        pn_box_margin_top = 5
+        pn_box_margin_right = 5
+        pn_box_x1 = page_width - pn_box_margin_right 
+        pn_box_x0 = pn_box_x1 - pn_box_width
+        pn_box_y0 = pn_box_margin_top
+        pn_box_y1 = pn_box_y0 + pn_box_height
+        pn_rect = fitz.Rect(pn_box_x0, pn_box_y0, pn_box_x1, pn_box_y1)
+
+        # Draw the rectangle for page number
+        page.draw_rect(
+            pn_rect,
+            fill=box_fill_color,
+            fill_opacity=box_opacity,
+            overlay=True, # Draw on top of existing content
+            width=0 # No border for the box itself
+        )
+
+        # Text position (vertically centered, horizontally centered in its box)
+        # Adjust text_rect for padding
+        text_rect = pn_rect + (box_padding, box_padding, -box_padding, -box_padding) # x0+pad, y0+pad, x1-pad, y1-pad
+                                                                                # (for insert_textbox, this means we define the textbox area)
+                                                                                # However, insert_textbox has its own alignment.
+                                                                                # Let's ensure the box is drawn, then place text carefully.
+                                                                                # For insert_textbox, the rect is where text is placed.
+                                                                                # We want text centered in pn_rect.
+
+        page.insert_textbox(
+            pn_rect, # Use the original pn_rect for positioning the text box
+            page_number_text,
+            fontsize=label_fontsize,
+            fontname=font.name, # Use the name of the loaded font
+            color=text_color,
+            align=fitz.TEXT_ALIGN_CENTER, # Horizontal center
+            # For vertical centering, insert_textbox is tricky.
+            # We ensure pn_box_height is snug, and text should fill it.
+            # Alternatively, calculate y position more precisely if needed.
+            overlay=True,
+        )
+
+        # --- Section Lines and Labels (Left Side) ---
+        if sections_per_page > 0:
+            for strip_idx in range(sections_per_page):
+                section_letter = chr(ord("A") + strip_idx) if strip_idx < 26 else "?" # Fallback for >26 sections
+                
+                # Calculate y-coordinates for the horizontal strip
+                strip_y0 = page_height * (strip_idx / sections_per_page)
+                strip_y1 = page_height * ((strip_idx + 1) / sections_per_page)
+
+                # Draw dividing line (optional, but helps visually separate sections)
+                # Draw line at the *bottom* of each section strip, except for the last one
+                if strip_idx < sections_per_page -1: # No line needed under the last section
+                    line_y = strip_y1 
+                    page.draw_line(
+                        fitz.Point(0, line_y),
+                        fitz.Point(page_width, line_y),
+                        color=(0.4, 0.4, 0.4),  # Gray color for the line
+                        width=0.5,
+                        overlay=True
+                    )
+
+                # Section Letter Annotation
+                letter_text_width = font.text_length(section_letter, fontsize=label_fontsize)
+                letter_box_width = letter_text_width + 2 * box_padding
+                letter_box_height = label_fontsize + 2 * box_padding
+
+                box_margin_left = 10  # Margin from the left edge of the page
+                box_offset_top = 5    # Offset from the top of the current strip
+
+                letter_box_x0 = box_margin_left
+                letter_box_y0 = strip_y0 + box_offset_top # Place box within the current strip
+                
+                letter_box_x1 = letter_box_x0 + letter_box_width
+                letter_box_y1 = letter_box_y0 + letter_box_height
+
+                # Ensure the annotation box does not go outside the current strip's vertical bounds
+                if letter_box_y1 <= strip_y1: # Check if the box fits within the strip
+                    letter_rect = fitz.Rect(letter_box_x0, letter_box_y0, letter_box_x1, letter_box_y1)
+                    
+                    page.draw_rect(
+                        letter_rect,
+                        fill=box_fill_color,
+                        fill_opacity=box_opacity,
+                        overlay=True,
+                        width=0 
+                    )
+                    
+                    # For insert_textbox, the rect defines the area where text is placed and aligned.
+                    page.insert_textbox(
+                        letter_rect, # Textbox area
+                        section_letter,
+                        fontsize=label_fontsize,
+                        fontname=font.name,
+                        color=text_color,
+                        align=fitz.TEXT_ALIGN_CENTER,
+                        overlay=True,
+                    )
+
+    doc.save(output_pdf_path, garbage=4, deflate=True, clean=True)
+    doc.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python pdf_annotator.py <input_pdf_path> <output_pdf_path>")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print("Usage: python pdf_annotator.py <input_pdf_path> <output_pdf_path> [sections_per_page]")
         sys.exit(1)
 
     input_path = sys.argv[1]
     output_path = sys.argv[2]
+    sections = 10 # Default value
+    if len(sys.argv) == 4:
+        try:
+            sections = int(sys.argv[3])
+            if sections < 0: # Also check for non-sensical negative numbers
+                print("Error: sections_per_page must be a non-negative integer.")
+                sys.exit(1)
+        except ValueError:
+            print("Error: sections_per_page must be an integer.")
+            sys.exit(1)
 
     try:
-        annotate_pdf(input_path, output_path)
+        annotate_pdf(input_path, output_path, sections_per_page=sections)
         print(f"Annotated PDF saved to: {output_path}")
     except FileNotFoundError as e:
         print(f"Error: {e}")
