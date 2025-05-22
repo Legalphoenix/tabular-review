@@ -61,7 +61,7 @@ def annotate_pdf(input_pdf_path: str, output_pdf_path: str, sections_per_page: i
                                                                                 # We want text centered in pn_rect.
 
         page.insert_textbox(
-            pn_rect, # Use the original pn_rect for positioning the text box
+            text_rect, # Use the padded text_rect for positioning the text box
             page_number_text,
             fontsize=label_fontsize,
             fontname=font.name, # Use the name of the loaded font
@@ -121,8 +121,10 @@ def annotate_pdf(input_pdf_path: str, output_pdf_path: str, sections_per_page: i
                     )
                     
                     # For insert_textbox, the rect defines the area where text is placed and aligned.
+                    # Define a padded rect for the text itself
+                    section_text_rect = letter_rect + (box_padding, box_padding, -box_padding, -box_padding)
                     page.insert_textbox(
-                        letter_rect, # Textbox area
+                        section_text_rect, # Textbox area (padded)
                         section_letter,
                         fontsize=label_fontsize,
                         fontname=font.name,
