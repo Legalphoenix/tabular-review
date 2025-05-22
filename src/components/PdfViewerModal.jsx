@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
-import { PDFViewer, PDFLinkService, EventBus } from 'pdfjs-dist/web/pdf_viewer.js';
+import { PDFViewer, PDFLinkService, EventBus } from 'pdfjs-dist/web/pdf_viewer.mjs';
 import 'pdfjs-dist/web/pdf_viewer.css';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-// Set the worker path for PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString();
+// Set the worker path for PDF.js using Vite's ?url import
+// pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString(); // Old method
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 const PdfViewerModal = ({
   isOpen,
