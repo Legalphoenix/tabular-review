@@ -7,6 +7,7 @@ import {
     IoAddOutline, IoEllipsisVertical, IoPinOutline, IoCheckmarkDoneOutline,
     IoCloseCircleOutline, IoArrowDownOutline, IoArrowUpOutline, IoFilterOutline
 } from 'react-icons/io5';
+import RenderCellContentWithCitations from './RenderCellContentWithCitations';
 
 const renderBulletedList = (text) => {
     if (!text) return null;
@@ -24,7 +25,7 @@ const renderBulletedList = (text) => {
     );
 };
 
-const EditableCellContent = ({ initialValue, onSave, format }) => {
+const EditableCellContent = ({ initialValue, onSave, format, docAnnotatedDetails, onOpenPdfViewer }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [value, setValue] = useState(initialValue);
     const textareaRef = useRef(null);
@@ -112,8 +113,26 @@ const EditableCellContent = ({ initialValue, onSave, format }) => {
         
         const displayStyle = { maxHeight: DISPLAY_CONTENT_MAX_HEIGHT_CSS, overflow: 'hidden' };
 
-        if (format === 'Bulleted list') {
-            return <div style={{...displayStyle, overflowY: 'auto'}}>{renderBulletedList(value)}</div>;
+        // RenderCellContentWithCitations will now handle different formats, including "Bulleted list"
+        if (value && docAnnotatedDetails && onOpenPdfViewer) {
+            return (
+                // The div wrapper here is for consistency and applying base styles/behavior
+                // RenderCellContentWithCitations itself will return appropriate block (ul, div) or inline elements
+                <div className="text-sm" style={displayStyle}>
+                    <RenderCellContentWithCitations
+                        text={value}
+                        docAnnotatedDetails={docAnnotatedDetails}
+                        onOpenPdfViewer={onOpenPdfViewer}
+                        colFormat={format} // Pass the column format
+                    />
+                </div>
+            );
+        }
+        // Fallback if essential props for citation rendering are missing, or if value is empty
+        // For empty value, the original behavior was an italic hyphen.
+        // If value is present but other props are missing, render plain text (or with renderBulletedList if it's a list)
+        if (format === 'Bulleted list') { // Fallback for bulleted list if citation rendering isn't possible
+             return <div style={{...displayStyle, overflowY: 'auto'}}>{renderBulletedList(value)}</div>;
         }
         return <div className="truncate-multiline text-sm" style={displayStyle}>{value}</div>;
     };
@@ -242,6 +261,7 @@ const ReviewTable = ({
   onAddDocumentClick,
   onAddColumnClick,
   onCellContentSave,
+  onOpenPdfViewer, // Make sure this is received from App.jsx
 }) => {
   const getCellStatus = (docId, colId) => tableData?.[docId]?.[colId]?.status || "idle";
   const getCellAnswer = (docId, colId) => tableData?.[docId]?.[colId]?.answer || "";
@@ -335,6 +355,8 @@ const ReviewTable = ({
                                 initialValue={answer}
                                 onSave={(newValue) => onCellContentSave(doc.id, col.id, newValue)}
                                 format={col.format}
+                                docAnnotatedDetails={doc.annotated_doc_details}
+                                onOpenPdfViewer={onOpenPdfViewer}
                               />
                           }
                         </div>

@@ -4,13 +4,25 @@ import DocumentUploader from './components/DocumentUploader';
 import ColumnEditorPopover from './components/ColumnEditorPopover';
 import ReviewTable from './components/ReviewTable';
 import ActionBar from './components/ActionBar';
+import PdfViewerModal from './components/PdfViewerModal';
 
 // Ensure API URLs are correct
 const API_URL = 'http://localhost:5001/api/generate'; // For cell generation
 const PROMPT_GENERATION_API_URL = 'http://localhost:5001/api/generate_prompt'; // For AI prompt generation
+const PREPROCESS_API_URL = 'http://localhost:5001/api/preprocess_pdf'; // For preprocessing PDFs
 
 function App() {
   // === State ===
+  // New document state structure:
+  // {
+  //   id: "unique_react_key",
+  //   user_given_name: "original_filename.pdf",
+  //   main_pdf_file: File,
+  //   appendix_pdf_files: [], // Array of File objects
+  //   is_processing: false,
+  //   processing_error: null,
+  //   annotated_doc_details: null // Populated by /api/preprocess_pdf response
+  // }
   const [documents, setDocuments] = useState([]);
   const [columns, setColumns] = useState([]);
   const [tableData, setTableData] = useState({});
@@ -18,6 +30,14 @@ function App() {
   const [editingColumnData, setEditingColumnData] = useState(null);
   const [reviewTitle, setReviewTitle] = useState("Untitled Review");
   const [currentDocIdForAppendix, setCurrentDocIdForAppendix] = useState(null);
+  const [pdfViewerModalProps, setPdfViewerModalProps] = useState({
+    isOpen: false,
+    filePath: '',
+    pageNumber: 1,
+    sectionLetter: 'A',
+    sectionsPerPage: 10, // Default, will be overridden by doc-specific value
+    // originalFilesManifest is not stored here, but passed to handler that needs it
+  });
 
   // === Refs ===
   const mainFileInputRef = useRef(null);
@@ -29,25 +49,96 @@ function App() {
     setReviewTitle(event.target.value);
   };
 
+  const handleOpenPdfViewer = useCallback((targetFilePath, targetPageNumber, targetSectionLetter, docSectionsPerPage) => {
+    setPdfViewerModalProps({
+      isOpen: true,
+      filePath: targetFilePath,
+      pageNumber: targetPageNumber,
+      sectionLetter: targetSectionLetter,
+      sectionsPerPage: docSectionsPerPage || 10,
+    });
+  }, []);
+
+  const handleClosePdfViewer = useCallback(() => {
+    setPdfViewerModalProps(prev => ({ ...prev, isOpen: false, filePath: '' })); // Clear filePath on close
+  }, []);
+
   const handleAddDocumentClick = () => {
     mainFileInputRef.current?.click();
   };
 
-  const handleDocumentsUploaded = useCallback((newDocs) => {
-    setDocuments((prev) => {
-      const existingNames = new Set(prev.map(d => d.name));
-      const uniqueNewDocs = newDocs.filter(nd => nd?.id && nd?.name && nd?.file && !existingNames.has(nd.name));
-      if (uniqueNewDocs.length === 0 && newDocs.length > 0) {
-         alert("Some or all selected documents already exist (based on name).");
-      }
-      return [...prev, ...uniqueNewDocs];
+  const triggerPreprocess = useCallback(async (docIdToUpdate, mainPdfFile, appendixPdfFilesArray) => {
+    setDocuments(prevDocs =>
+      prevDocs.map(doc =>
+        doc.id === docIdToUpdate ? { ...doc, is_processing: true, processing_error: null } : doc
+      )
+    );
+
+    const formData = new FormData();
+    formData.append('main_pdf', mainPdfFile, mainPdfFile.name);
+    (appendixPdfFilesArray || []).forEach((file) => {
+      formData.append('appendix_pdfs', file, file.name);
     });
+
+    try {
+      const response = await fetch(PREPROCESS_API_URL, { method: 'POST', body: formData });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Preprocessing failed with status ' + response.status }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      const result = await response.json();
+      setDocuments(prevDocs =>
+        prevDocs.map(doc =>
+          doc.id === docIdToUpdate ? { ...doc, is_processing: false, annotated_doc_details: result } : doc
+        )
+      );
+    } catch (error) {
+      console.error('Preprocessing error:', error);
+      setDocuments(prevDocs =>
+        prevDocs.map(doc =>
+          doc.id === docIdToUpdate ? { ...doc, is_processing: false, processing_error: error.message } : doc
+        )
+      );
+    }
   }, []);
+
+  const handleDocumentsUploaded = useCallback((newDocs) => { // newDocs from DocumentUploader are {id, name, file}
+    const docsToAdd = [];
+    const existingNames = new Set(documents.map(d => d.user_given_name));
+
+    newDocs.forEach(doc => {
+      if (existingNames.has(doc.name)) {
+        alert(`Document with name "${doc.name}" already exists.`);
+        return;
+      }
+      if (!doc.id || !doc.name || !doc.file) return;
+
+      const newDocEntry = {
+        id: doc.id, // Use ID from DocumentUploader
+        user_given_name: doc.name,
+        main_pdf_file: doc.file,
+        appendix_pdf_files: [], // Initially no appendices
+        is_processing: false,
+        processing_error: null,
+        annotated_doc_details: null
+      };
+      docsToAdd.push(newDocEntry);
+    });
+
+    if (docsToAdd.length > 0) {
+      setDocuments(prev => [...prev, ...docsToAdd]);
+      docsToAdd.forEach(docEntry => {
+        triggerPreprocess(docEntry.id, docEntry.main_pdf_file, docEntry.appendix_pdf_files);
+      });
+    }
+  }, [documents, triggerPreprocess]);
 
   const removeDoc = useCallback((idToRemove) => {
      const docToRemove = documents.find(d => d.id === idToRemove);
-     if (window.confirm(`Are you sure you want to remove "${docToRemove?.name}" and all its data?`)) {
+     if (window.confirm(`Are you sure you want to remove "${docToRemove?.user_given_name}" and all its data?`)) {
+        // Future: Call /api/cleanup_processing_job/<processing_id> if docToRemove.annotated_doc_details?.processing_id exists
         setDocuments((p) => p.filter((d) => d.id !== idToRemove));
+        // Also clear related tableData if necessary, though useEffect should handle this
      }
   }, [documents]);
 
@@ -56,42 +147,73 @@ function App() {
     appendixFileInputRef.current?.click();
   };
 
-  const handleAppendicesUploaded = useCallback((appendixDocs) => {
-    if (!currentDocIdForAppendix || appendixDocs.length === 0) return;
+  const handleAppendicesUploaded = useCallback((appendixFiles) => { // appendixFiles are {id, name, file} from DocumentUploader
+    if (!currentDocIdForAppendix || appendixFiles.length === 0) return;
     const targetDocId = currentDocIdForAppendix;
-    setDocuments(prevDocs =>
-      prevDocs.map(doc => {
+
+    let updatedDocForPreprocessing = null;
+
+    setDocuments(prevDocs => {
+      const newDocs = prevDocs.map(doc => {
         if (doc.id === targetDocId) {
-          const currentAppendices = doc.appendices || [];
-          const existingAppendixNames = new Set(currentAppendices.map(a => a.name));
-          const newAppendices = appendixDocs
-             .filter(apDoc => apDoc?.id && apDoc?.name && apDoc?.file)
-             .map(apDoc => ({ id: apDoc.id, name: apDoc.name, file: apDoc.file }))
-             .filter(na => !existingAppendixNames.has(na.name));
-           if (newAppendices.length === 0 && appendixDocs.length > 0) {
-                alert("Some or all selected appendices already exist for this document (based on name).");
-           }
-          return { ...doc, appendices: [...currentAppendices, ...newAppendices] };
+          const existingAppendixNames = new Set(doc.appendix_pdf_files.map(f => f.name));
+          const uniqueNewAppendixFiles = appendixFiles
+            .filter(apFile => apFile?.file && !existingAppendixNames.has(apFile.name))
+            .map(apFile => apFile.file);
+
+          if (uniqueNewAppendixFiles.length === 0 && appendixFiles.length > 0) {
+            alert("Some or all selected appendices already exist for this document (based on name).");
+          }
+          
+          if (uniqueNewAppendixFiles.length > 0) {
+            const updatedEntry = {
+              ...doc,
+              appendix_pdf_files: [...doc.appendix_pdf_files, ...uniqueNewAppendixFiles]
+            };
+            updatedDocForPreprocessing = updatedEntry;
+            return updatedEntry;
+          }
         }
         return doc;
-      })
-    );
+      });
+      return newDocs;
+    });
+    
+    if (updatedDocForPreprocessing) {
+        triggerPreprocess(
+            updatedDocForPreprocessing.id, 
+            updatedDocForPreprocessing.main_pdf_file, 
+            updatedDocForPreprocessing.appendix_pdf_files
+        );
+    }
     setCurrentDocIdForAppendix(null);
-  }, [currentDocIdForAppendix]);
+  }, [currentDocIdForAppendix, triggerPreprocess]);
 
-  const handleRemoveAppendix = useCallback((mainDocId, appendixIdToRemove) => {
+  const handleRemoveAppendix = useCallback((mainDocId, appendixFileToRemove) => { // appendixFileToRemove is a File object
+    let updatedDocForPreprocessing = null;
     setDocuments(prevDocs =>
       prevDocs.map(doc => {
         if (doc.id === mainDocId) {
-           const appendixToRemove = (doc.appendices || []).find(app => app.id === appendixIdToRemove);
-           if (appendixToRemove && window.confirm(`Remove appendix "${appendixToRemove.name}"?`)) {
-                return { ...doc, appendices: (doc.appendices || []).filter(app => app.id !== appendixIdToRemove) };
-           }
+          if (window.confirm(`Remove appendix "${appendixFileToRemove.name}"?`)) {
+            const newAppendixFiles = doc.appendix_pdf_files.filter(
+              appFile => appFile.name !== appendixFileToRemove.name || appFile.size !== appendixFileToRemove.size // Basic check
+            );
+            updatedDocForPreprocessing = { ...doc, appendix_pdf_files: newAppendixFiles };
+            return updatedDocForPreprocessing;
+          }
         }
         return doc;
       })
     );
-  }, []);
+
+    if (updatedDocForPreprocessing) {
+      triggerPreprocess(
+        updatedDocForPreprocessing.id,
+        updatedDocForPreprocessing.main_pdf_file,
+        updatedDocForPreprocessing.appendix_pdf_files
+      );
+    }
+  }, [triggerPreprocess]);
 
   const handleAddColumnClick = () => { openColumnModalForNew(); };
 
@@ -155,15 +277,30 @@ function App() {
     async (docId, colId) => {
       const doc = documents.find((d) => d.id === docId);
       const col = columns.find((c) => c.id === colId);
-      if (!doc || !col || !doc.file || col.format === 'Manual input') {
+
+      if (!doc || !col || col.format === 'Manual input') {
         if (col?.format === 'Manual input') { console.log(`Skipping Manual Input: ${col.label}`); }
-        else {
-          console.error("Cannot run review: Missing document, column, or file.", { docId, colId });
-          setTableData((p) => ({ ...p, [docId]: { ...(p[docId] || {}), [colId]: { status: "error", answer: "Missing doc/col info" }}}));
-        }
+        else { console.error("Cannot run review: Missing document or column.", { docId, colId }); }
         return;
       }
+
+      if (doc.is_processing) {
+        alert("Document is still processing. Please wait.");
+        return;
+      }
+      if (doc.processing_error) {
+        alert(`Cannot run cell: Document preprocessing failed: ${doc.processing_error}`);
+        setTableData((p) => ({ ...p, [docId]: { ...(p[docId] || {}), [colId]: { status: "error", answer: `Preprocessing failed: ${doc.processing_error}` }}}));
+        return;
+      }
+      if (!doc.annotated_doc_details?.annotated_pdf_path) {
+        alert("Annotated document path not available. Preprocessing might not have completed successfully.");
+        setTableData((p) => ({ ...p, [docId]: { ...(p[docId] || {}), [colId]: { status: "error", answer: "Annotated PDF not ready" }}}));
+        return;
+      }
+
       setTableData((p) => ({ ...p, [docId]: { ...(p[docId] || {}), [colId]: { ...((p[docId] || {})[colId] || {}), status: "loading" }}}));
+      
       let finalPrompt = col.prompt;
       switch (col.format) {
         case 'Yes/No': finalPrompt += "\n\nAnswer only with 'Yes' or 'No'."; break;
@@ -171,9 +308,14 @@ function App() {
         case 'Date': finalPrompt += "\n\nExtract the date. If possible, format it as YYYY-MM-DD. If multiple dates are relevant, list them."; break;
         // ... (other cases)
       }
+
+      // Append citation instruction
+      finalPrompt += "\n\nWhen referencing information from the document, you MUST use the format [ref:P<page_number>S<section_letter>]. For example, if the information is on Page 7 in Section D, cite it as [ref:P7SD]. The document pages are labeled 'Page X' and sections are labeled 'Section A', 'Section B', etc. Ensure you use this exact format for all references.";
+      
       const form = new FormData();
-      form.append("file", doc.file, doc.name);
+      form.append("annotated_pdf_path", doc.annotated_doc_details.annotated_pdf_path);
       form.append("prompt", finalPrompt);
+      
       try {
         const res = await fetch(API_URL, { method: "POST", body: form });
         const data = await res.json();
@@ -204,8 +346,11 @@ function App() {
     if (!documents.length || !columns.length) { alert("No data to export."); return; }
     const headers = ["Document (Appendices)", ...columns.map((c) => c.label)].join(",");
     const rows = documents.map((d) => {
-      let docNameWithAppendices = d.name;
-      if (d.appendices?.length > 0) { docNameWithAppendices += ` (+${d.appendices.length} appx: ${d.appendices.map(a => a.name).join(', ')})`; }
+      let docNameWithAppendices = d.user_given_name;
+      // Display appendix file names from appendix_pdf_files
+      if (d.appendix_pdf_files?.length > 0) { 
+        docNameWithAppendices += ` (+${d.appendix_pdf_files.length} appx: ${d.appendix_pdf_files.map(f => f.name).join(', ')})`; 
+      }
       const escapedDocName = /[,"\n]/.test(docNameWithAppendices) ? `"${docNameWithAppendices.replace(/"/g, '""')}"` : docNameWithAppendices;
       const cells = columns.map((c) => {
         const ans = tableData?.[d.id]?.[c.id]?.answer || "";
@@ -293,8 +438,10 @@ function App() {
           onAddDocumentClick={handleAddDocumentClick}
           onAddColumnClick={openColumnModalForNew}
           onCellContentSave={handleCellContentSave}
+          onOpenPdfViewer={handleOpenPdfViewer} 
         />
       </main>
+      <PdfViewerModal {...pdfViewerModalProps} onClose={handleClosePdfViewer} />
     </div>
   );
 }
