@@ -19,7 +19,7 @@ client = genai.Client(api_key=api_key)
 model_name = "gemini-2.0-flash-lite"
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}, r"/uploads/*": {"origins": "http://localhost:5173"}})
 
 UPLOADS_DIR = "uploads"
 os.makedirs(UPLOADS_DIR, exist_ok=True)

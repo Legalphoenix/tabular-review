@@ -311,7 +311,7 @@ const ReviewTable = ({
                     <div className="flex items-start justify-between">
                         <div className="flex-grow min-w-0">
                             <span className="text-xs text-gray-400 mr-1.5">{docIndex + 1}.</span>
-                            <span className="truncate block" title={doc.user_given_name}>{doc.user_given_name}</span>
+                            <span className="truncate inline" title={doc.user_given_name}>{doc.user_given_name}</span>
                         </div>
                         <div className="flex items-center space-x-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-2">
                             <button
