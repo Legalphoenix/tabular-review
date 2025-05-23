@@ -311,30 +311,30 @@ const ReviewTable = ({
                     <div className="flex items-start justify-between">
                         <div className="flex-grow min-w-0">
                             <span className="text-xs text-gray-400 mr-1.5">{docIndex + 1}.</span>
-                            <span className="truncate block" title={doc.name}>{doc.name}</span>
+                            <span className="truncate block" title={doc.user_given_name}>{doc.user_given_name}</span>
                         </div>
                         <div className="flex items-center space-x-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-2">
                             <button
                             onClick={() => onAddAppendixClick(doc.id)}
                             className="text-gray-400 hover:text-indigo-600 p-1 rounded hover:bg-gray-100"
                             title="Add appendix document"
-                            aria-label={`Add appendix to ${doc.name}`}
+                            aria-label={`Add appendix to ${doc.user_given_name}`}
                             >
                             <IoDocumentAttachOutline size={16} />
                             </button>
                             <button
                             onClick={() => onRemoveDocument(doc.id)}
                             className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-gray-100"
-                            title={`Remove ${doc.name} and its appendices`}
-                            aria-label={`Remove ${doc.name}`}
+                            title={`Remove ${doc.user_given_name} and its appendices`}
+                            aria-label={`Remove ${doc.user_given_name}`}
                             >
                             <IoTrashOutline size={16} />
                             </button>
                         </div>
                     </div>
-                    {doc.appendices && doc.appendices.length > 0 && (
+                    {doc.appendix_pdf_files && doc.appendix_pdf_files.length > 0 && (
                       <div className="text-xs text-gray-500 mt-1 pl-5">
-                        {doc.appendices.length} appendix{doc.appendices.length > 1 ? 'es' : ''}
+                        {doc.appendix_pdf_files.length} appendix{doc.appendix_pdf_files.length > 1 ? 'es' : ''}
                       </div>
                     )}
                   </td>
@@ -379,26 +379,26 @@ const ReviewTable = ({
                   })}
                    <td className="px-3 py-2.5 border-r border-gray-200 align-top w-[150px]"></td>
                 </tr>
-                 {doc.appendices?.map((appendix) => (
-                    <tr key={appendix.id} className="bg-gray-50 hover:bg-gray-100/80 transition-colors duration-150 group">
+                 {doc.appendix_pdf_files?.map((appendixFile, appendixIndex) => (
+                    <tr key={appendixFile.name || `appendix-${appendixIndex}`} className="bg-gray-50 hover:bg-gray-100/80 transition-colors duration-150 group">
                         <td className="sticky left-0 bg-gray-50 group-hover:bg-gray-100/80 px-3 py-1.5 text-sm text-gray-600 border-r border-gray-200 z-10 align-top w-[280px]">
                             <div className="flex items-center justify-between pl-4">
                                 <div className="flex items-center truncate">
                                     <IoChevronForward size={12} className="mr-1 text-gray-400 flex-shrink-0"/>
                                     <IoFileTrayFullOutline size={14} className="mr-1.5 text-gray-400 flex-shrink-0"/>
-                                    <span className="truncate" title={appendix.name}>{appendix.name}</span>
+                                    <span className="truncate" title={appendixFile.name}>{appendixFile.name}</span>
                                 </div>
                                 <button
-                                    onClick={() => onRemoveAppendix(doc.id, appendix.id)}
+                                    onClick={() => onRemoveAppendix(doc.id, appendixFile)}
                                     className="ml-2 text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title={`Remove appendix ${appendix.name}`}
+                                    title={`Remove appendix ${appendixFile.name}`}
                                 >
                                     <IoTrashOutline size={15} />
                                 </button>
                             </div>
                         </td>
                         {columns.map(col => (
-                            <td key={`${appendix.id}-${col.id}`} className="px-3 py-1.5 text-sm text-gray-400 italic border-r border-gray-200 align-top w-[350px]">
+                            <td key={`${appendixFile.name || `appendix-${appendixIndex}`}-${col.id}`} className="px-3 py-1.5 text-sm text-gray-400 italic border-r border-gray-200 align-top w-[350px]">
                                 -
                             </td>
                          ))}

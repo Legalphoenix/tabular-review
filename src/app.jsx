@@ -10,6 +10,7 @@ import PdfViewerModal from './components/PdfViewerModal';
 const API_URL = 'http://localhost:5001/api/generate'; // For cell generation
 const PROMPT_GENERATION_API_URL = 'http://localhost:5001/api/generate_prompt'; // For AI prompt generation
 const PREPROCESS_API_URL = 'http://localhost:5001/api/preprocess_pdf'; // For preprocessing PDFs
+const SERVER_BASE_URL = 'http://localhost:5001'; // Base URL for serving files
 
 function App() {
   // === State ===
@@ -49,10 +50,14 @@ function App() {
     setReviewTitle(event.target.value);
   };
 
-  const handleOpenPdfViewer = useCallback((targetFilePath, targetPageNumber, targetSectionLetter, docSectionsPerPage) => {
+  const handleOpenPdfViewer = useCallback((targetOriginalFilePath, targetPageNumber, targetSectionLetter, docSectionsPerPage) => {
+    // Construct full URL for the PDF file
+    // targetOriginalFilePath is like "uploads/processing_id/filename.pdf"
+    const fullUrl = new URL(targetOriginalFilePath, SERVER_BASE_URL).toString();
+    
     setPdfViewerModalProps({
       isOpen: true,
-      filePath: targetFilePath,
+      filePath: fullUrl,
       pageNumber: targetPageNumber,
       sectionLetter: targetSectionLetter,
       sectionsPerPage: docSectionsPerPage || 10,
