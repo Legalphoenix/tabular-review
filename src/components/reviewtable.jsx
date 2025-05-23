@@ -311,22 +311,22 @@ const ReviewTable = ({
                     <div className="flex items-start justify-between">
                         <div className="flex-grow min-w-0">
                             <span className="text-xs text-gray-400 mr-1.5">{docIndex + 1}.</span>
-                            <span className="truncate block" title={doc.name}>{doc.name}</span>
+                            <span className="truncate block" title={doc.user_given_name}>{doc.user_given_name}</span>
                         </div>
                         <div className="flex items-center space-x-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-2">
                             <button
                             onClick={() => onAddAppendixClick(doc.id)}
                             className="text-gray-400 hover:text-indigo-600 p-1 rounded hover:bg-gray-100"
                             title="Add appendix document"
-                            aria-label={`Add appendix to ${doc.name}`}
+                            aria-label={`Add appendix to ${doc.user_given_name}`}
                             >
                             <IoDocumentAttachOutline size={16} />
                             </button>
                             <button
                             onClick={() => onRemoveDocument(doc.id)}
                             className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-gray-100"
-                            title={`Remove ${doc.name} and its appendices`}
-                            aria-label={`Remove ${doc.name}`}
+                            title={`Remove ${doc.user_given_name} and its appendices`}
+                            aria-label={`Remove ${doc.user_given_name}`}
                             >
                             <IoTrashOutline size={16} />
                             </button>

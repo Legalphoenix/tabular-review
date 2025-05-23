@@ -50,9 +50,12 @@ function App() {
   };
 
   const handleOpenPdfViewer = useCallback((targetFilePath, targetPageNumber, targetSectionLetter, docSectionsPerPage) => {
+  // Construct the full URL for the PDF file
+  const fullUrl = `http://localhost:5001/${targetFilePath}`; // Assuming targetFilePath starts with 'uploads/'
+  
     setPdfViewerModalProps({
       isOpen: true,
-      filePath: targetFilePath,
+    filePath: fullUrl, // Use the constructed full URL
       pageNumber: targetPageNumber,
       sectionLetter: targetSectionLetter,
       sectionsPerPage: docSectionsPerPage || 10,
